@@ -48,9 +48,6 @@ dependencies:
   google_mlkit_text_recognition: ^0.15.1
   flutter_tesseract_ocr: ^0.4.30
   image_picker: ^1.2.1
-  translator: ^1.0.4+1
-  flutter_whisper_kit: ^0.2.0
-  webview_flutter: ^4.13.1
 
 dev_dependencies:
   flutter_test:
@@ -76,8 +73,6 @@ flutter:
     - assets/models/yolov8n_saved_model/yolov8n_float32.tflite
     - assets/tessdata/
     - assets/tessdata_config.json
-    - assets/images/
-    - assets/models/currency/best_float32.tflite
 
   # To add assets to your application, add an assets section, like this:
   # assets:

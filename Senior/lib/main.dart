@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:senior/ui/view/camera.dart';
-import 'package:senior/ui/view/splashscreen/splashscreen.dart';
 
 late List<CameraDescription> cameras;
 
@@ -42,7 +41,7 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.amber),
       debugShowCheckedModeBanner: false,
-      home: const SplashScreen(),
+      home: const CameraScreen(),
     );
   }
 }

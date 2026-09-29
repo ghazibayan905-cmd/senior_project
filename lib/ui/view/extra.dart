@@ -1,5 +1,3 @@
-// import 'dart:async';
-
 // import 'package:flutter/material.dart';
 // import 'package:ultralytics_yolo/ultralytics_yolo.dart';
 // import 'package:flutter/services.dart' show MethodChannel, rootBundle;
@@ -26,33 +24,58 @@
 // class _CameraScreenState extends State<CameraScreen> {
 //   String? _modelPath;
 //   bool _loading = true;
-//   String espIp = "10.171.6.41";
-
-//   String get espCaptureUrl => "http://$espIp/capture";
-
 //   static const MethodChannel _platform = MethodChannel("voice_service_channel");
 
 //   final FlutterTts tts = FlutterTts();
 //   final stt.SpeechToText sttInstance = stt.SpeechToText();
 //   final translator = GoogleTranslator();
-//   static const String _placeServerUrl = 'http://192.168.2.200:5000';
+//   static const String _placeServerUrl = 'http://192.168.2.165:5000';
 //   // عداد الضغطات
 //   int _tapCount = 0;
 //   DateTime _lastTapTime = DateTime.now();
 
 //   // موديل العملة
 //   late YOLO currencyModel;
-//   late YOLO objectModel;
+
+//   static const List<String> _currencyLabels = [
+//     '200-new',
+//     '2000-old',
+//     '25-new',
+//     '50-new',
+//     '500-new',
+//     '5000-old',
+//   ];
+
+//   static const Map<String, String> _currencyLabelArabic = {
+//     '200-new': '200 ليرة جديدة',
+//     '2000-old': '2000 ليرة قديمة',
+//     '25-new': '25 ليرة جديدة',
+//     '50-new': '50 ليرة جديدة',
+//     '500-new': '500 ليرة جديدة',
+//     '5000-old': '5000 ليرة قديمة',
+//   };
+
+//   String _canonicalCurrencyLabelKey(String rawLabel) {
+//     final cleaned = rawLabel.trim().toLowerCase().replaceAll(
+//       RegExp(r'[\s\-_]+'),
+//       '-',
+//     );
+//     final match = RegExp(
+//       r'^(?<value>\d+)-?(?<type>new|old)$',
+//     ).firstMatch(cleaned);
+
+//     if (match != null) {
+//       return '${match.namedGroup('value')}-${match.namedGroup('type')}';
+//     }
+
+//     return cleaned;
+//   }
 
 //   bool wakeWordDetected = false;
 //   bool assistantBusy = false;
 //   bool isSpeaking = false;
 //   bool readingText = false;
-//   bool detectingPlace = false; 
-//   bool useEspCamera = false;
-  
-//   Timer? espTimer;
-// String lastEspmessage = "";
+//   bool detectingPlace = false;
 //   DateTime lastPlaceDetection = DateTime.now().subtract(
 //     const Duration(seconds: 10),
 //   );
@@ -96,14 +119,6 @@
 //       "أهلاً بك. هذا التطبيق يدعم التعرف على الطقس، الوقت، التعرف على المكان، والتعرف على الأشياء.",
 //     );
 //     initVoiceAssistant();
-//   espTimer = Timer.periodic(
-//   const Duration(milliseconds: 700),
-//   (_) async {
-//     if (!assistantBusy && !isSpeaking) {
-//       await testObjectModel();
-//     }
-//   },
-// );
 //   }
 
 //   Future<void> _loadCurrencyModel() async {
@@ -115,7 +130,6 @@
 //     await file.writeAsBytes(data.buffer.asUint8List());
 
 //     currencyModel = YOLO(modelPath: file.path, task: YOLOTask.detect);
-//     await currencyModel.loadModel();
 //   }
 
 //   // ⭐ دالة نسخ ملف اللغة داخل app documents (تعمل 100% على Huawei/Honor)
@@ -189,18 +203,26 @@
 //     List<String> labels = [];
 
 //     for (var r in boxes) {
-//       String label = "غير معروفة";
+//       String rawLabel = "";
+//       double confidence = 0.0;
 
 //       if (r is YOLOResult && r.className != null) {
-//         label = r.className.toString();
+//         rawLabel = r.className.toString();
+//         confidence = r.confidence ?? 0.0;
 //       } else if (r is Map) {
-//         label =
-//             r["className"]?.toString() ??
-//             r["class"]?.toString() ??
-//             "غير معروفة";
+//         rawLabel = r["className"]?.toString() ?? r["class"]?.toString() ?? "";
+//         confidence = (r["confidence"] is num)
+//             ? (r["confidence"] as num).toDouble()
+//             : 0.0;
 //       }
 
-//       labels.add(label);
+//       final canonicalLabel = _canonicalCurrencyLabelKey(rawLabel);
+
+//       if (!_currencyLabels.contains(canonicalLabel) || confidence < 0.5) {
+//         continue;
+//       }
+
+//       labels.add(_currencyLabelArabic[canonicalLabel] ?? rawLabel);
 //     }
 
 //     // ⭐ نطق حسب عدد العملات
@@ -460,21 +482,12 @@
 
 //   Future<void> _loadModel() async {
 //     final data = await rootBundle.load(_candidateModelPaths.first);
-
 //     final dir = await getTemporaryDirectory();
-
 //     final file = File('${dir.path}/model.tflite');
-
 //     await file.writeAsBytes(data.buffer.asUint8List());
 
-//     _modelPath = file.path;
-
-//     objectModel = YOLO(modelPath: _modelPath!, task: YOLOTask.detect);
-
-//     await objectModel.loadModel();
-//     print("OBJECT MODEL LOADED");
-
 //     setState(() {
+//       _modelPath = file.path;
 //       _loading = false;
 //     });
 //   }
@@ -848,127 +861,6 @@
 //     detectingPlace = false;
 //   }
 
-//   Future<Uint8List?> getEspFrame() async {
-  
-//     try {
-//       final response = await http.get(Uri.parse(espCaptureUrl));
-
-//       if (response.statusCode == 200) {
-//         return response.bodyBytes;
-//       }
-
-//       return null;
-//     } catch (e) {
-//       print("ESP ERROR: $e");
-//       return null;
-//     }
-//   }
-// Future<void> testObjectModel() async {
-//   final frame = await getEspFrame();
-
-//   if (frame == null) {
-//     print("NO FRAME");
-//     return;
-//   }
-
-//   final results = await objectModel.predict(frame);
-
-//   final boxes = results["boxes"] as List;
-
-//   if (boxes.isEmpty) return;
-
-//   // ترتيب حسب أكبر مساحة (الأقرب أولاً)
-//   boxes.sort((a, b) {
-//     final areaA =
-//         ((a["x2"] as num).toDouble() - (a["x1"] as num).toDouble()) *
-//         ((a["y2"] as num).toDouble() - (a["y1"] as num).toDouble());
-
-//     final areaB =
-//         ((b["x2"] as num).toDouble() - (b["x1"] as num).toDouble()) *
-//         ((b["y2"] as num).toDouble() - (b["y1"] as num).toDouble());
-
-//     return areaB.compareTo(areaA);
-//   });
-
-//   String finalMessage = "";
-
-//   for (final first in boxes.take(5)) {
-//     final x1 = (first["x1"] as num).toDouble();
-//     final x2 = (first["x2"] as num).toDouble();
-//     final y1 = (first["y1"] as num).toDouble();
-//     final y2 = (first["y2"] as num).toDouble();
-
-//     final centerX = (x1 + x2) / 2;
-
-//     String direction;
-
-//     if (centerX < 320 * 0.33) {
-//       direction = "على يسارك";
-//     } else if (centerX > 320 * 0.66) {
-//       direction = "على يمينك";
-//     } else {
-//       direction = "أمامك";
-//     }
-
-//     final width = x2 - x1;
-//     final height = y2 - y1;
-
-//     final area = width * height;
-
-//     String distance;
-
-//     if (area > 25000) {
-//       distance = "قريب جدًا";
-//     } else if (area > 15000) {
-//       distance = "قريب";
-//     } else if (area > 7000) {
-//       distance = "متوسط";
-//     } else {
-//       distance = "بعيد";
-//     }
-
-//     final className = first["className"].toString();
-//     final arabicName = _translate(className);
-
-//     finalMessage += "$direction $arabicName $distance، ";
-//   }
-
-//   // لا تعيد نفس الرسالة
-// if (finalMessage != lastEspmessage) {
-//   lastEspmessage = finalMessage;
-
-//   print("NEW MESSAGE = $finalMessage");
-
-//   if (!assistantBusy && !isSpeaking) {
-//     assistantBusy = true;
-
-//     await tts.speak(finalMessage);
-
-//     assistantBusy = false;
-//   }
-// }
-// }
-
-//   Future<void> testEspPrediction() async {
-//     final frame = await getEspFrame();
-    
-
-//     if (frame == null) {
-//       print("No frame received");
-//       return;
-//     }
-
-//     final results = await objectModel.predict(frame);
-
-//     final boxes = results["boxes"] as List;
-
-//     print("Boxes Count = ${boxes.length}");
-
-//     for (var box in boxes) {
-//       print(box);
-//     }
-//   }
-
 //   @override
 //   Widget build(BuildContext context) {
 //     return Scaffold(
@@ -978,61 +870,8 @@
 //           ? const Center(child: CircularProgressIndicator(color: Colors.white))
 //           : Stack(
 //               children: [
-//                 // ESP32-CAM Stream
-
-//                 // Loading Indicator while WebView loads
-//                 const Center(
-//                   child: Column(
-//                     mainAxisAlignment: MainAxisAlignment.center,
-//                     children: [
-//                       CircularProgressIndicator(color: Colors.white),
-//                       SizedBox(height: 20),
-//                       Text(
-//                         "جاري تحميل البث...",
-//                         style: TextStyle(color: Colors.white, fontSize: 18),
-//                       ),
-//                     ],
-//                   ),
-//                 ),
-
-//                 // Error Message
-//                 Positioned(
-//                   top: 100,
-//                   left: 20,
-//                   right: 20,
-//                   child: Container(
-//                     padding: const EdgeInsets.all(20),
-//                     decoration: BoxDecoration(
-//                       color: Colors.red.withOpacity(0.9),
-//                       borderRadius: BorderRadius.circular(10),
-//                     ),
-//                     child: Column(
-//                       mainAxisSize: MainAxisSize.min,
-//                       children: [
-//                         const Text(
-//                           "❌ خطأ في الاتصال",
-//                           style: TextStyle(
-//                             color: Colors.white,
-//                             fontSize: 18,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                         const SizedBox(height: 10),
-
-//                         const SizedBox(height: 15),
-//                         ElevatedButton(
-//                           onPressed: () {
-//                             setState(() {});
-//                           },
-//                           child: const Text("🔄 أعد المحاولة"),
-//                         ),
-//                       ],
-//                     ),
-//                   ),
-//                 ),
-
 //                 // =========================
-//                 // CAMERA VIEW - Hidden (keeping for capture functionality)
+//                 // CAMERA VIEW
 //                 // =========================
 //                 RepaintBoundary(
 //                   key: _cameraKey,
@@ -1063,7 +902,9 @@
 //                       final rect = r.boundingBox;
 
 //                       final screenWidth = MediaQuery.of(context).size.width;
+
 //                       final screenHeight = MediaQuery.of(context).size.height;
+
 //                       final screenArea = screenWidth * screenHeight;
 
 //                       final centerX = rect.center.dx;
@@ -1330,6 +1171,5 @@
 //     sttInstance.stop();
 //     tts.stop();
 //     super.dispose();
-//     espTimer?.cancel();
 //   }
 // }

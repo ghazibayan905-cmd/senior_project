@@ -1,5 +1,3 @@
-// import 'dart:async';
-
 // import 'package:flutter/material.dart';
 // import 'package:ultralytics_yolo/ultralytics_yolo.dart';
 // import 'package:flutter/services.dart' show MethodChannel, rootBundle;
@@ -15,6 +13,7 @@
 // import 'dart:ui' as ui;
 // import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
 // import 'package:translator/translator.dart';
+// import 'package:webview_flutter/webview_flutter.dart';
 
 // class CameraScreen extends StatefulWidget {
 //   const CameraScreen({super.key});
@@ -26,33 +25,27 @@
 // class _CameraScreenState extends State<CameraScreen> {
 //   String? _modelPath;
 //   bool _loading = true;
-//   String espIp = "10.171.6.41";
-
-//   String get espCaptureUrl => "http://$espIp/capture";
-
 //   static const MethodChannel _platform = MethodChannel("voice_service_channel");
 
 //   final FlutterTts tts = FlutterTts();
 //   final stt.SpeechToText sttInstance = stt.SpeechToText();
 //   final translator = GoogleTranslator();
-//   static const String _placeServerUrl = 'http://192.168.2.200:5000';
+//   static const String _placeServerUrl = 'http://192.168.2.165:5000';
 //   // عداد الضغطات
 //   int _tapCount = 0;
 //   DateTime _lastTapTime = DateTime.now();
 
 //   // موديل العملة
 //   late YOLO currencyModel;
-//   late YOLO objectModel;
+//   late final WebViewController webcontroller;
 
 //   bool wakeWordDetected = false;
 //   bool assistantBusy = false;
 //   bool isSpeaking = false;
 //   bool readingText = false;
-//   bool detectingPlace = false; 
-//   bool useEspCamera = false;
-  
-//   Timer? espTimer;
-// String lastEspmessage = "";
+//   bool detectingPlace = false;
+//   bool webviewLoaded = false;
+//   String webviewError = "";
 //   DateTime lastPlaceDetection = DateTime.now().subtract(
 //     const Duration(seconds: 10),
 //   );
@@ -81,6 +74,29 @@
 //   @override
 //   void initState() {
 //     super.initState();
+//     webcontroller = WebViewController()
+//       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+//       ..setNavigationDelegate(
+//         NavigationDelegate(
+//           onPageStarted: (String url) {
+//             print("WebView: Loading started - $url");
+//           },
+//           onPageFinished: (String url) {
+//             print("WebView: Loading finished - $url");
+//             setState(() {
+//               webviewLoaded = true;
+//               webviewError = "";
+//             });
+//           },
+//           onWebResourceError: (WebResourceError error) {
+//             print("WebView Error: ${error.description}");
+//             setState(() {
+//               webviewError = "خطأ في التحميل: ${error.description}";
+//             });
+//           },
+//         ),
+//       )
+//       ..loadRequest(Uri.parse("http://10.171.6.41/stream"));
 
 //     // ⭐ نسخ ملف اللغة داخل cache
 //     _initTesseract();
@@ -96,14 +112,6 @@
 //       "أهلاً بك. هذا التطبيق يدعم التعرف على الطقس، الوقت، التعرف على المكان، والتعرف على الأشياء.",
 //     );
 //     initVoiceAssistant();
-//   espTimer = Timer.periodic(
-//   const Duration(milliseconds: 700),
-//   (_) async {
-//     if (!assistantBusy && !isSpeaking) {
-//       await testObjectModel();
-//     }
-//   },
-// );
 //   }
 
 //   Future<void> _loadCurrencyModel() async {
@@ -115,7 +123,6 @@
 //     await file.writeAsBytes(data.buffer.asUint8List());
 
 //     currencyModel = YOLO(modelPath: file.path, task: YOLOTask.detect);
-//     await currencyModel.loadModel();
 //   }
 
 //   // ⭐ دالة نسخ ملف اللغة داخل app documents (تعمل 100% على Huawei/Honor)
@@ -460,21 +467,12 @@
 
 //   Future<void> _loadModel() async {
 //     final data = await rootBundle.load(_candidateModelPaths.first);
-
 //     final dir = await getTemporaryDirectory();
-
 //     final file = File('${dir.path}/model.tflite');
-
 //     await file.writeAsBytes(data.buffer.asUint8List());
 
-//     _modelPath = file.path;
-
-//     objectModel = YOLO(modelPath: _modelPath!, task: YOLOTask.detect);
-
-//     await objectModel.loadModel();
-//     print("OBJECT MODEL LOADED");
-
 //     setState(() {
+//       _modelPath = file.path;
 //       _loading = false;
 //     });
 //   }
@@ -848,127 +846,6 @@
 //     detectingPlace = false;
 //   }
 
-//   Future<Uint8List?> getEspFrame() async {
-  
-//     try {
-//       final response = await http.get(Uri.parse(espCaptureUrl));
-
-//       if (response.statusCode == 200) {
-//         return response.bodyBytes;
-//       }
-
-//       return null;
-//     } catch (e) {
-//       print("ESP ERROR: $e");
-//       return null;
-//     }
-//   }
-// Future<void> testObjectModel() async {
-//   final frame = await getEspFrame();
-
-//   if (frame == null) {
-//     print("NO FRAME");
-//     return;
-//   }
-
-//   final results = await objectModel.predict(frame);
-
-//   final boxes = results["boxes"] as List;
-
-//   if (boxes.isEmpty) return;
-
-//   // ترتيب حسب أكبر مساحة (الأقرب أولاً)
-//   boxes.sort((a, b) {
-//     final areaA =
-//         ((a["x2"] as num).toDouble() - (a["x1"] as num).toDouble()) *
-//         ((a["y2"] as num).toDouble() - (a["y1"] as num).toDouble());
-
-//     final areaB =
-//         ((b["x2"] as num).toDouble() - (b["x1"] as num).toDouble()) *
-//         ((b["y2"] as num).toDouble() - (b["y1"] as num).toDouble());
-
-//     return areaB.compareTo(areaA);
-//   });
-
-//   String finalMessage = "";
-
-//   for (final first in boxes.take(5)) {
-//     final x1 = (first["x1"] as num).toDouble();
-//     final x2 = (first["x2"] as num).toDouble();
-//     final y1 = (first["y1"] as num).toDouble();
-//     final y2 = (first["y2"] as num).toDouble();
-
-//     final centerX = (x1 + x2) / 2;
-
-//     String direction;
-
-//     if (centerX < 320 * 0.33) {
-//       direction = "على يسارك";
-//     } else if (centerX > 320 * 0.66) {
-//       direction = "على يمينك";
-//     } else {
-//       direction = "أمامك";
-//     }
-
-//     final width = x2 - x1;
-//     final height = y2 - y1;
-
-//     final area = width * height;
-
-//     String distance;
-
-//     if (area > 25000) {
-//       distance = "قريب جدًا";
-//     } else if (area > 15000) {
-//       distance = "قريب";
-//     } else if (area > 7000) {
-//       distance = "متوسط";
-//     } else {
-//       distance = "بعيد";
-//     }
-
-//     final className = first["className"].toString();
-//     final arabicName = _translate(className);
-
-//     finalMessage += "$direction $arabicName $distance، ";
-//   }
-
-//   // لا تعيد نفس الرسالة
-// if (finalMessage != lastEspmessage) {
-//   lastEspmessage = finalMessage;
-
-//   print("NEW MESSAGE = $finalMessage");
-
-//   if (!assistantBusy && !isSpeaking) {
-//     assistantBusy = true;
-
-//     await tts.speak(finalMessage);
-
-//     assistantBusy = false;
-//   }
-// }
-// }
-
-//   Future<void> testEspPrediction() async {
-//     final frame = await getEspFrame();
-    
-
-//     if (frame == null) {
-//       print("No frame received");
-//       return;
-//     }
-
-//     final results = await objectModel.predict(frame);
-
-//     final boxes = results["boxes"] as List;
-
-//     print("Boxes Count = ${boxes.length}");
-
-//     for (var box in boxes) {
-//       print(box);
-//     }
-//   }
-
 //   @override
 //   Widget build(BuildContext context) {
 //     return Scaffold(
@@ -979,172 +856,91 @@
 //           : Stack(
 //               children: [
 //                 // ESP32-CAM Stream
-
-//                 // Loading Indicator while WebView loads
-//                 const Center(
-//                   child: Column(
-//                     mainAxisAlignment: MainAxisAlignment.center,
-//                     children: [
-//                       CircularProgressIndicator(color: Colors.white),
-//                       SizedBox(height: 20),
-//                       Text(
-//                         "جاري تحميل البث...",
-//                         style: TextStyle(color: Colors.white, fontSize: 18),
-//                       ),
-//                     ],
-//                   ),
+//                 SizedBox.expand(
+//                   child: WebViewWidget(controller: webcontroller),
 //                 ),
 
-//                 // Error Message
-//                 Positioned(
-//                   top: 100,
-//                   left: 20,
-//                   right: 20,
-//                   child: Container(
-//                     padding: const EdgeInsets.all(20),
-//                     decoration: BoxDecoration(
-//                       color: Colors.red.withOpacity(0.9),
-//                       borderRadius: BorderRadius.circular(10),
-//                     ),
+//                 // Loading Indicator while WebView loads
+//                 if (!webviewLoaded)
+//                   const Center(
 //                     child: Column(
-//                       mainAxisSize: MainAxisSize.min,
+//                       mainAxisAlignment: MainAxisAlignment.center,
 //                       children: [
-//                         const Text(
-//                           "❌ خطأ في الاتصال",
-//                           style: TextStyle(
-//                             color: Colors.white,
-//                             fontSize: 18,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                         const SizedBox(height: 10),
-
-//                         const SizedBox(height: 15),
-//                         ElevatedButton(
-//                           onPressed: () {
-//                             setState(() {});
-//                           },
-//                           child: const Text("🔄 أعد المحاولة"),
+//                         CircularProgressIndicator(color: Colors.white),
+//                         SizedBox(height: 20),
+//                         Text(
+//                           "جاري تحميل البث...",
+//                           style: TextStyle(color: Colors.white, fontSize: 18),
 //                         ),
 //                       ],
 //                     ),
 //                   ),
-//                 ),
+
+//                 // Error Message
+//                 if (webviewError.isNotEmpty)
+//                   Positioned(
+//                     top: 100,
+//                     left: 20,
+//                     right: 20,
+//                     child: Container(
+//                       padding: const EdgeInsets.all(20),
+//                       decoration: BoxDecoration(
+//                         color: Colors.red.withOpacity(0.9),
+//                         borderRadius: BorderRadius.circular(10),
+//                       ),
+//                       child: Column(
+//                         mainAxisSize: MainAxisSize.min,
+//                         children: [
+//                           const Text(
+//                             "❌ خطأ في الاتصال",
+//                             style: TextStyle(
+//                               color: Colors.white,
+//                               fontSize: 18,
+//                               fontWeight: FontWeight.bold,
+//                             ),
+//                           ),
+//                           const SizedBox(height: 10),
+//                           Text(
+//                             webviewError,
+//                             style: const TextStyle(
+//                               color: Colors.white,
+//                               fontSize: 16,
+//                             ),
+//                             textAlign: TextAlign.center,
+//                           ),
+//                           const SizedBox(height: 15),
+//                           ElevatedButton(
+//                             onPressed: () {
+//                               setState(() {
+//                                 webviewError = "";
+//                                 webviewLoaded = false;
+//                               });
+//                               webcontroller.reload();
+//                             },
+//                             child: const Text("🔄 أعد المحاولة"),
+//                           ),
+//                         ],
+//                       ),
+//                     ),
+//                   ),
 
 //                 // =========================
 //                 // CAMERA VIEW - Hidden (keeping for capture functionality)
 //                 // =========================
 //                 RepaintBoundary(
 //                   key: _cameraKey,
-//                   child: YOLOView(
-//                     modelPath: _modelPath!,
-//                     task: YOLOTask.detect,
-//                     useGpu: false,
-
-//                     onResult: (results) async {
-//                       if (detectingPlace) return;
-//                       if (assistantBusy) return;
-//                       if (results.isEmpty) return;
-
-//                       results = results
-//                           .where((r) => r.confidence > 0.5)
-//                           .toList();
-
-//                       if (results.isEmpty) return;
-
-//                       results.sort(
-//                         (a, b) => (b.boundingBox.width * b.boundingBox.height)
-//                             .compareTo(
-//                               a.boundingBox.width * a.boundingBox.height,
-//                             ),
-//                       );
-
-//                       final r = results.first;
-//                       final rect = r.boundingBox;
-
-//                       final screenWidth = MediaQuery.of(context).size.width;
-//                       final screenHeight = MediaQuery.of(context).size.height;
-//                       final screenArea = screenWidth * screenHeight;
-
-//                       final centerX = rect.center.dx;
-
-//                       String direction;
-
-//                       if (centerX < screenWidth * 0.33) {
-//                         direction = "على يسارك";
-//                       } else if (centerX > screenWidth * 0.66) {
-//                         direction = "على يمينك";
-//                       } else {
-//                         direction = "أمامك";
-//                       }
-
-//                       final area = rect.width * rect.height;
-
-//                       String distance;
-//                       bool danger = false;
-
-//                       if (area > screenArea * 0.40) {
-//                         distance = "قريب جدًا";
-//                         danger = true;
-//                       } else if (area > screenArea * 0.25) {
-//                         distance = "قريب";
-//                       } else if (area > screenArea * 0.10) {
-//                         distance = "متوسط";
-//                       } else {
-//                         distance = "بعيد";
-//                       }
-
-//                       if (DateTime.now()
-//                               .difference(lastSpeakTime)
-//                               .inMilliseconds <
-//                           1800) {
-//                         return;
-//                       }
-
-//                       if (isSpeaking) return;
-
-//                       final name = _translate(r.className);
-
-//                       String message;
-
-//                       if (danger) {
-//                         message = "تحذير! جسم قريب جدًا أمامك";
-//                       } else {
-//                         message = "$direction $name $distance";
-//                       }
-
-//                       if (_lastSpokenMessage == message &&
-//                           DateTime.now()
-//                                   .difference(_lastMessageTime)
-//                                   .inSeconds <
-//                               4) {
-//                         return;
-//                       }
-
-//                       setState(() {
-//                         _lastSpokenMessage = message;
-//                       });
-
-//                       assistantBusy = true;
-//                       isSpeaking = true;
-
-//                       lastSpeakTime = DateTime.now();
-
-//                       try {
-//                         if (danger) {
-//                           if (await Vibration.hasVibrator() ?? false) {
-//                             Vibration.vibrate(duration: 700);
-//                           }
-//                         }
-
-//                         await tts.speak(message);
-
-//                         _lastMessageTime = DateTime.now();
-//                       } finally {
-//                         isSpeaking = false;
-//                         assistantBusy = false;
-//                       }
-//                     },
+//                   child: Opacity(
+//                     opacity: 0,
+//                     child: SizedBox(
+//                       width: 1,
+//                       height: 1,
+//                       child: YOLOView(
+//                         modelPath: _modelPath!,
+//                         task: YOLOTask.detect,
+//                         useGpu: false,
+//                         onResult: (results) async {},
+//                       ),
+//                     ),
 //                   ),
 //                 ),
 //                 Positioned.fill(
@@ -1330,6 +1126,5 @@
 //     sttInstance.stop();
 //     tts.stop();
 //     super.dispose();
-//     espTimer?.cancel();
 //   }
 // }

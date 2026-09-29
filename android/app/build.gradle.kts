@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.bayan.senior"
-    compileSdk = 36   // ⚠️ الأفضل 34 بدل 36 حالياً
+    compileSdk = 36  
     ndkVersion = "28.2.13676358"
 
     // Required for TFLite models: YOLO loads via AssetFileDescriptor (openFd),
@@ -25,7 +25,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.senior"
+       applicationId = "com.bayan.senior"
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
